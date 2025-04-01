@@ -27,7 +27,7 @@ import java.util.Objects;
 @Slf4j
 public class DishServiceImpl implements DishService {
     @Autowired
-    private  DishMapper dishMapper;
+    private DishMapper dishMapper;
     @Autowired
     private DishFlavorMapper dishFlavorMapper;
     @Autowired
@@ -35,6 +35,7 @@ public class DishServiceImpl implements DishService {
 
     /**
      * 新增菜品和对应口味
+     *
      * @param dishDTO
      */
     @Transactional // 事务注解
@@ -47,13 +48,13 @@ public class DishServiceImpl implements DishService {
         dishMapper.insert(dish);
 
 //        获取insert语句生成的主键值
-        Long DishId = dish.getId();
+        Long dishId = dish.getId();
 
 //        向口味表插入n条数据
         List<DishFlavor> flavors = dishDTO.getFlavors();
-        if(flavors != null && !flavors.isEmpty()) {
+        if (flavors != null && !flavors.isEmpty()) {
             flavors.forEach(dishFlavor -> {
-                dishFlavor.setDishId(DishId);
+                dishFlavor.setDishId(dishId);
             });
             dishFlavorMapper.insertBatch(flavors);
         }
@@ -61,17 +62,19 @@ public class DishServiceImpl implements DishService {
 
     /**
      * 分页查询菜品
+     *
      * @param dishPageQueryDTO
      * @return
      */
     public PageResult pageQuery(DishPageQueryDTO dishPageQueryDTO) {
-        PageHelper.startPage(dishPageQueryDTO.getPage(),dishPageQueryDTO.getPageSize());
+        PageHelper.startPage(dishPageQueryDTO.getPage(), dishPageQueryDTO.getPageSize());
         Page<DishVO> page = dishMapper.pageQuery(dishPageQueryDTO);
-        return new PageResult(page.getTotal(),page.getResult());
+        return new PageResult(page.getTotal(), page.getResult());
     }
 
     /**
      * 菜品批量删除
+     *
      * @param ids
      */
     @Transactional
@@ -79,14 +82,14 @@ public class DishServiceImpl implements DishService {
 //        判断当前菜品是否能够删除---是否存在起售中的菜品
         for (Long id : ids) {
             Dish dish = dishMapper.getById(id);
-            if(Objects.equals(dish.getStatus(), StatusConstant.ENABLE)){
+            if (Objects.equals(dish.getStatus(), StatusConstant.ENABLE)) {
 //                当前菜品处于起售中
                 throw new DeletionNotAllowedException(MessageConstant.DISH_ON_SALE);
             }
         }
 //        判断当前菜品是否能够删除---是否被套餐关联了
         List<Long> setmealIds = setmealDishMapper.getSetmealsByDishIds(ids);
-        if(setmealIds != null && !setmealIds.isEmpty()) {
+        if (setmealIds != null && !setmealIds.isEmpty()) {
 //            当前菜品被套餐关联了,不能删除
             throw new DeletionNotAllowedException(MessageConstant.DISH_BE_RELATED_BY_SETMEAL);
         }
@@ -97,5 +100,45 @@ public class DishServiceImpl implements DishService {
             dishFlavorMapper.deleteByDishId(id);
         }
 
+    }
+
+    /**
+     * 根据id查询菜品和对应的口味数据
+     *
+     * @param id
+     * @return
+     */
+    public DishVO getByIdWithFlavor(Long id) {
+//        根据id查询菜品数据
+        Dish dish = dishMapper.getById(id);
+//        根据菜品id查询口味数据
+        List<DishFlavor> dishFlavors = dishFlavorMapper.getByDishId(id);
+//        将查询到的数据封装到VO
+        DishVO dishVo = new DishVO();
+        BeanUtils.copyProperties(dish, dishVo);
+        dishVo.setFlavors(dishFlavors);
+        return dishVo;
+    }
+
+    /**
+     * 修改菜品基本信息和对应的口味信息
+     *
+     * @param dishDTO
+     */
+    public void updateWithFlavor(DishDTO dishDTO) {
+        Dish dish = new Dish();
+        BeanUtils.copyProperties(dishDTO, dish);
+//        修改菜品表基本信息
+        dishMapper.update(dish);
+//        删除原有的口味数据
+        dishFlavorMapper.deleteByDishId(dishDTO.getId());
+//        重新插入口味数据
+        List<DishFlavor> flavors = dishDTO.getFlavors();
+        if (flavors != null && !flavors.isEmpty()) {
+            flavors.forEach(dishFlavor -> {
+                dishFlavor.setDishId(dishDTO.getId());
+            });
+            dishFlavorMapper.insertBatch(flavors);
+        }
     }
 }
