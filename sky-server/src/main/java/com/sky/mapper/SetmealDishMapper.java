@@ -1,7 +1,6 @@
 package com.sky.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
@@ -9,8 +8,8 @@ import java.util.List;
 public interface SetmealDishMapper {
     /**
      * 根据菜品id查询对应的套餐id
-     * @param dishID
+     * @param dishIds
      * @return
      */
-    List<Long> getSetmealsByDishIds(List<Long> dishIds);
+    List<Long> getSetmealIdsByDishIds(List<Long> dishIds);
 }
