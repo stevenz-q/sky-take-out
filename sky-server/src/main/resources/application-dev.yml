@@ -8,11 +8,14 @@ sky:
     password: 1234
   alioss:
     endpoint: oss-cn-hangzhou.aliyuncs.com
-    accessKeyId: LTAI5tQdtuYcynhbkcoyNq6z
-    accessKeySecret: ftpuWF9vkXpqgRgboFQOeFsztioavW
-    bucketName: web-zyq1415
+    access-key-id: LTAI5tQdtuYcynhbkcoyNq6z
+    access-key-secret: ftpuWF9vkXpqgRgboFQOeFsztioavW
+    bucket-name: web-zyq1415
   redis:
     host: localhost
     port: 6379
     password: 123456
     database: 10
+  wechat:
+    appid: wxd2818c722748b536
+    secret: 0a3d9aadcc88cf73b8d30a04bc82a9bc
