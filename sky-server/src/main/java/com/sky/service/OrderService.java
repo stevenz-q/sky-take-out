@@ -23,6 +23,14 @@ public interface OrderService {
     OrderPaymentVO payment(OrdersPaymentDTO ordersPaymentDTO) throws Exception;
 
     /**
+     * 订单支付dev:绕过微信支付接口
+     *
+     * @param ordersPaymentDTO
+     * @return
+     */
+    OrderPaymentVO paymentDev(OrdersPaymentDTO ordersPaymentDTO);
+
+    /**
      * 支付成功，修改订单状态
      *
      * @param outTradeNo

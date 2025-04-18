@@ -13,6 +13,7 @@ import com.sky.service.OrderService;
 import com.sky.utils.WeChatPayUtil;
 import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderSubmitVO;
+import org.apache.commons.lang.RandomStringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -124,6 +125,27 @@ public class OrderServiceImpl implements OrderService {
         vo.setPackageStr(jsonObject.getString("package"));
 
         return vo;
+    }
+
+    /**
+     * 订单支付dev:绕过微信支付接口
+     *
+     * @param ordersPaymentDTO
+     * @return
+     */
+    public OrderPaymentVO paymentDev(OrdersPaymentDTO ordersPaymentDTO) {
+        // 跳过微信订单支付,生成 OrderPaymentVO
+        String nonceStr = RandomStringUtils.randomNumeric(32);
+        String timeStamp = String.valueOf(System.currentTimeMillis() / 1000);
+        String prepayId = "一个prepayId";
+        OrderPaymentVO orderPaymentVO = OrderPaymentVO.builder()
+                .nonceStr(nonceStr) // 随机字符串
+                .paySign("一个加密的签名")
+                .timeStamp(timeStamp) // 时间戳
+                .signType("RSA") // 签名算法
+                .packageStr("prepay_id=" + prepayId)
+                .build();
+        return orderPaymentVO;
     }
 
     /**
