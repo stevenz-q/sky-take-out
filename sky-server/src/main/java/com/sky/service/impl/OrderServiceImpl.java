@@ -79,9 +79,11 @@ public class OrderServiceImpl implements OrderService {
         orders.setPayStatus(Orders.UN_PAID);
         orders.setStatus(Orders.PENDING_PAYMENT);
         orders.setNumber(String.valueOf(System.currentTimeMillis()));
+        orders.setAddress(addressBook.getDetail());
         orders.setPhone(addressBook.getPhone());
         orders.setConsignee(addressBook.getConsignee());
         orders.setUserId(userId);
+        orders.setTablewareNumber(ordersSubmitDTO.getTablewareNumber());
         orderMapper.insert(orders);
         // 向订单明细表插入n条数据
         List<OrderDetail> OrderDetails = new ArrayList<OrderDetail>();
@@ -320,6 +322,7 @@ public class OrderServiceImpl implements OrderService {
 
         return new PageResult(page.getTotal(), orderVOList);
     }
+
     private List<OrderVO> getOrderVOList(Page<Orders> page) {
         // 需要返回订单菜品信息，自定义OrderVO响应结果
         List<OrderVO> orderVOList = new ArrayList<>();
@@ -368,7 +371,7 @@ public class OrderServiceImpl implements OrderService {
     public OrderStatisticsVO statistics() {
         Integer toBeConfirmed = orderMapper.countStatus(Orders.TO_BE_CONFIRMED);
         Integer confirmed = orderMapper.countStatus(Orders.CONFIRMED);
-        Integer deliveryInProgress  = orderMapper.countStatus(Orders.DELIVERY_IN_PROGRESS);
+        Integer deliveryInProgress = orderMapper.countStatus(Orders.DELIVERY_IN_PROGRESS);
 
         OrderStatisticsVO orderStatisticsVO = new OrderStatisticsVO();
         orderStatisticsVO.setToBeConfirmed(toBeConfirmed);
