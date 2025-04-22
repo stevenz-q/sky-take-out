@@ -1,5 +1,7 @@
 package com.sky.service.impl;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -13,6 +15,7 @@ import com.sky.exception.OrderBusinessException;
 import com.sky.mapper.*;
 import com.sky.result.PageResult;
 import com.sky.service.OrderService;
+import com.sky.utils.HttpClientUtil;
 import com.sky.utils.WeChatPayUtil;
 import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderStatisticsVO;
@@ -22,14 +25,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.RandomStringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.UriUtils;
 
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +54,15 @@ public class OrderServiceImpl implements OrderService {
     private WeChatPayUtil weChatPayUtil;
     @Autowired
     private UserMapper userMapper;
+    @Value("${sky.shop.address}")
+    private String shopAddress; // 店铺地址
+    @Value("${sky.baidu.ak}")
+    private String AK; // 百度ak
+    @Value("${sky.baidu.sk}")
+    private String SK; // 百度sk
+    private static final String URL = "https://api.map.baidu.com"; // 百度API地址
+    private static final String GEOCODING_PATH = "/geocoding/v3"; // 地理编码路径
+    private static final String DIRECTIONLITE_PATH = "/directionlite/v1/driving"; // 驾车规划路径
 
     /**
      * 用户下单
@@ -64,6 +79,9 @@ public class OrderServiceImpl implements OrderService {
             // 抛出业务异常
             throw new AddressBookBusinessException(MessageConstant.ADDRESS_BOOK_IS_NULL);
         }
+        // 检查用户下单的地址是否超出配送范围
+        checkOutOfRange(addressBook.getProvinceName() + addressBook.getCityName() + addressBook.getDistrictName() + addressBook.getDetail());
+
         // 查询当前用户的购物车数据
         Long userId = BaseContext.getCurrentId();
         ShoppingCart shoppingCart = new ShoppingCart();
@@ -80,7 +98,7 @@ public class OrderServiceImpl implements OrderService {
         orders.setPayStatus(Orders.UN_PAID);
         orders.setStatus(Orders.PENDING_PAYMENT);
         orders.setNumber(String.valueOf(System.currentTimeMillis()));
-        orders.setAddress(addressBook.getDetail());
+        orders.setAddress(addressBook.getProvinceName() + addressBook.getCityName() + addressBook.getDistrictName() + addressBook.getDetail());
         orders.setPhone(addressBook.getPhone());
         orders.setConsignee(addressBook.getConsignee());
         orders.setUserId(userId);
@@ -507,4 +525,155 @@ public class OrderServiceImpl implements OrderService {
         orderMapper.update(orders);
     }
 
+    /**
+     * 检查客户的收货地址是否超出配送范围
+     * 利用百度地图api实现:地理编码获取两地经纬度,驾车路线规划获取配送距离
+     *
+     * @param address
+     */
+    private void checkOutOfRange(String address) {
+        Map map = new LinkedHashMap<String, String>();
+        map.put("address", shopAddress);
+        map.put("output", "json");
+        map.put("ak", AK);
+
+        try {
+            map.put("sn", caculateSn(GEOCODING_PATH, map));
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+        String shopCoordinate = HttpClientUtil.doGet(URL + GEOCODING_PATH, map);
+        JSONObject jsonObject = JSON.parseObject(shopCoordinate);
+        if (!jsonObject.getString("status").equals("0")) {
+            log.error("请求数据:{}", map);
+            log.error("响应数据:{}", jsonObject);
+            throw new OrderBusinessException("店铺地址解析失败");
+        }
+
+        //数据解析
+        JSONObject location = jsonObject.getJSONObject("result").getJSONObject("location");
+        String lat = location.getString("lat");
+        String lng = location.getString("lng");
+        //店铺经纬度坐标
+        String shopLngLat = lat + "," + lng;
+        map.remove("sn");
+        // 必须删除此元素或者开辟新变量否则计算的sn错误
+        map.put("address", address);
+        try {
+            map.put("sn", caculateSn(GEOCODING_PATH, map));
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+        //获取用户收货地址的经纬度坐标
+        String userCoordinate = HttpClientUtil.doGet(URL + GEOCODING_PATH, map);
+
+        jsonObject = JSON.parseObject(userCoordinate);
+        if (!jsonObject.getString("status").equals("0")) {
+            log.error("请求数据:{}", map);
+            log.error("响应数据:{}", jsonObject);
+            throw new OrderBusinessException("收货地址解析失败");
+        }
+
+        //数据解析
+        location = jsonObject.getJSONObject("result").getJSONObject("location");
+        lat = location.getString("lat");
+        lng = location.getString("lng");
+        //用户收货地址经纬度坐标
+        String userLngLat = lat + "," + lng;
+
+        Map params = new LinkedHashMap<String, String>();
+        params.put("origin", shopLngLat);
+        params.put("destination", userLngLat);
+        params.put("ak", AK);
+        params.put("steps_info", "0");
+        String currentTimestamp = String.valueOf(System.currentTimeMillis());
+        params.put("timestamp", currentTimestamp);
+        try {
+            params.put("sn", caculateSn(DIRECTIONLITE_PATH, params));
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+        //路线规划
+        log.info("params:{}", params);
+        String json = HttpClientUtil.doGet(URL + DIRECTIONLITE_PATH, params);
+
+        jsonObject = JSON.parseObject(json);
+        if (!jsonObject.getString("status").equals("0")) {
+            log.error("请求数据:{}", params);
+            log.error("响应数据:{}", jsonObject);
+            throw new OrderBusinessException("配送路线规划失败");
+        }
+
+        //数据解析
+        JSONObject result = jsonObject.getJSONObject("result");
+        JSONArray jsonArray = (JSONArray) result.get("routes");
+        Integer distance = (Integer) ((JSONObject) jsonArray.get(0)).get("distance");
+        log.info("配送距离:{}", distance);
+        if (distance > 5000) {
+            //配送距离超过5000米
+            throw new OrderBusinessException("超出配送范围");
+        }
+    }
+
+    public String caculateSn(String Mapping, Map paramsMap) throws UnsupportedEncodingException,
+            NoSuchAlgorithmException {
+
+        // 计算sn跟参数对出现顺序有关，get请求请使用LinkedHashMap保存<key,value>，该方法根据key的插入顺序排序；post请使用TreeMap保存<key,value>，该方法会自动将key按照字母a-z顺序排序。
+        // 所以get请求可自定义参数顺序（sn参数必须在最后）发送请求，但是post请求必须按照字母a-z顺序填充body（sn参数必须在最后）。
+        // 以get请求为例：http://api.map.baidu.com/geocoder/v2/?address=百度大厦&output=json&ak=yourak，paramsMap中先放入address，再放output，然后放ak，放入顺序必须跟get请求中对应参数的出现顺序保持一致。
+        // 调用下面的toQueryString方法，对LinkedHashMap内所有value作utf8编码，拼接返回结果address=%E7%99%BE%E5%BA%A6%E5%A4%A7%E5%8E%A6&output=json&ak=yourak
+        String paramsStr = toQueryString(paramsMap);
+
+        // 对paramsStr前面拼接上/geocoder/v2/?，后面直接拼接yoursk得到/geocoder/v2/?address=%E7%99%BE%E5%BA%A6%E5%A4%A7%E5%8E%A6&output=json&ak=yourakyoursk
+        //String wholeStr = new String("/geocoding/v3?" + paramsStr + SK);
+        String wholeStr = new String(Mapping + "?" + paramsStr + SK);
+
+//        System.out.println(wholeStr);
+        // 对上面wholeStr再作utf8编码
+        String tempStr = URLEncoder.encode(wholeStr, "UTF-8");
+
+        // 调用下面的MD5方法得到最后的sn签名
+        String sn = MD5(tempStr);
+//        System.out.println(sn);
+        return sn;
+    }
+
+    // 对Map内所有value作utf8编码，拼接返回结果
+    public String toQueryString(Map<?, ?> data)
+            throws UnsupportedEncodingException {
+        StringBuffer queryString = new StringBuffer();
+        for (Map.Entry<?, ?> pair : data.entrySet()) {
+            queryString.append(pair.getKey() + "=");
+            //    第一种方式使用的 jdk 自带的转码方式  第二种方式使用的 spring 的转码方法 两种均可
+            //    queryString.append(URLEncoder.encode((String) pair.getValue(), "UTF-8").replace("+", "%20") + "&");
+            queryString.append(UriUtils.encode((String) pair.getValue(), "UTF-8") + "&");
+        }
+        if (queryString.length() > 0) {
+            queryString.deleteCharAt(queryString.length() - 1);
+        }
+        return queryString.toString();
+    }
+
+    // 来自stackoverflow的MD5计算方法，调用了MessageDigest库函数，并把byte数组结果转换成16进制
+    public String MD5(String md5) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest
+                    .getInstance("MD5");
+            byte[] array = md.digest(md5.getBytes());
+            StringBuffer sb = new StringBuffer();
+            for (int i = 0; i < array.length; ++i) {
+                sb.append(Integer.toHexString((array[i] & 0xFF) | 0x100)
+                        .substring(1, 3));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+        }
+        return null;
+    }
 }

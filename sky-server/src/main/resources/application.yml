@@ -37,23 +37,39 @@ logging:
 sky:
   jwt:
     # 设置jwt签名加密时使用的秘钥
-    admin-secret-key: itcast
+    admin-secret-key: ${sky.jwt.admin-secret-key}
     # 设置jwt过期时间
-    admin-ttl: 7200000
+    admin-ttl: ${sky.jwt.admin-ttl}
     # 设置前端传递过来的令牌名称
-    admin-token-name: token
+    admin-token-name: ${sky.jwt.admin-token-nam}
     # 设置jwt签名加密时使用的秘钥
-    user-secret-key: itheima
+    user-secret-key: ${sky.jwt.user-secret-key}
     # 设置jwt过期时间
-    user-ttl: 7200000
+    user-ttl: ${sky.jwt.user-ttl}
     # 设置前端传递过来的令牌名称
-    user-token-name: authentication
-  #阿里云OSS
+    user-token-name: ${sky.jwt.user-token-name}
+
+  # 阿里云OSS
   alioss:
     endpoint: ${sky.alioss.endpoint}
     accessKeyId: ${sky.alioss.access-key-id}
     accessKeySecret: ${sky.alioss.access-key-secret}
     bucketName: ${sky.alioss.bucket-name}
+  # 微信小程序
   wechat:
     appid: ${sky.wechat.appid}
     secret: ${sky.wechat.secret}
+    mchid: ${sky.wechat.mchid}
+    mchSerialNo: ${sky.wechat.mchSerialNo}
+    privateKeyFilePath: ${sky.wechat.privateKeyFilePath}
+    apiV3Key: ${sky.wechat.apiV3Key}
+    weChatPayCertFilePath: ${sky.wechat.weChatPayCertFilePath}
+    notifyUrl: ${sky.wechat.notifyUrl}
+    refundNotifyUrl: ${sky.wechat.refundNotifyUrl}
+  # 配置店铺默认地址
+  shop:
+    address: ${sky.shop.address}
+  # 配置百度地图API
+  baidu:
+    ak: ${sky.baidu.ak}
+    sk: ${sky.baidu.sk}
