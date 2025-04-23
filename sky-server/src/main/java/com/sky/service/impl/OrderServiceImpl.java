@@ -532,6 +532,7 @@ public class OrderServiceImpl implements OrderService {
      * @param address
      */
     private void checkOutOfRange(String address) {
+        // 使用LinkedHashMap
         Map map = new LinkedHashMap<String, String>();
         map.put("address", shopAddress);
         map.put("output", "json");
@@ -544,6 +545,7 @@ public class OrderServiceImpl implements OrderService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
+        log.info("获取店铺地址坐标map值:{}", map);
         String shopCoordinate = HttpClientUtil.doGet(URL + GEOCODING_PATH, map);
         JSONObject jsonObject = JSON.parseObject(shopCoordinate);
         if (!jsonObject.getString("status").equals("0")) {
@@ -568,6 +570,7 @@ public class OrderServiceImpl implements OrderService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
+        log.info("获取用户收货地址坐标map值:{}", map);
         //获取用户收货地址的经纬度坐标
         String userCoordinate = HttpClientUtil.doGet(URL + GEOCODING_PATH, map);
 
@@ -584,28 +587,28 @@ public class OrderServiceImpl implements OrderService {
         lng = location.getString("lng");
         //用户收货地址经纬度坐标
         String userLngLat = lat + "," + lng;
-
-        Map params = new LinkedHashMap<String, String>();
-        params.put("origin", shopLngLat);
-        params.put("destination", userLngLat);
-        params.put("ak", AK);
-        params.put("steps_info", "0");
+        // 清空map,防止计算sn错误
+        map.clear();
+        map.put("origin", shopLngLat);
+        map.put("destination", userLngLat);
+        map.put("ak", AK);
+        map.put("steps_info", "0");
         String currentTimestamp = String.valueOf(System.currentTimeMillis());
-        params.put("timestamp", currentTimestamp);
+        map.put("timestamp", currentTimestamp);
         try {
-            params.put("sn", caculateSn(DIRECTIONLITE_PATH, params));
+            map.put("sn", caculateSn(DIRECTIONLITE_PATH, map));
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
         //路线规划
-        log.info("params:{}", params);
-        String json = HttpClientUtil.doGet(URL + DIRECTIONLITE_PATH, params);
+        log.info("路线规划map值:{}", map);
+        String json = HttpClientUtil.doGet(URL + DIRECTIONLITE_PATH, map);
 
         jsonObject = JSON.parseObject(json);
         if (!jsonObject.getString("status").equals("0")) {
-            log.error("请求数据:{}", params);
+            log.error("请求数据:{}", map);
             log.error("响应数据:{}", jsonObject);
             throw new OrderBusinessException("配送路线规划失败");
         }
@@ -621,6 +624,15 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    /**
+     * 百度api计算sn
+     *
+     * @param Mapping
+     * @param paramsMap
+     * @return
+     * @throws UnsupportedEncodingException
+     * @throws NoSuchAlgorithmException
+     */
     public String caculateSn(String Mapping, Map paramsMap) throws UnsupportedEncodingException,
             NoSuchAlgorithmException {
 
@@ -631,7 +643,6 @@ public class OrderServiceImpl implements OrderService {
         String paramsStr = toQueryString(paramsMap);
 
         // 对paramsStr前面拼接上/geocoder/v2/?，后面直接拼接yoursk得到/geocoder/v2/?address=%E7%99%BE%E5%BA%A6%E5%A4%A7%E5%8E%A6&output=json&ak=yourakyoursk
-        //String wholeStr = new String("/geocoding/v3?" + paramsStr + SK);
         String wholeStr = new String(Mapping + "?" + paramsStr + SK);
 
 //        System.out.println(wholeStr);
@@ -644,6 +655,13 @@ public class OrderServiceImpl implements OrderService {
         return sn;
     }
 
+    /**
+     * 对Map内所有value作utf8编码
+     *
+     * @param data
+     * @return
+     * @throws UnsupportedEncodingException
+     */
     // 对Map内所有value作utf8编码，拼接返回结果
     public String toQueryString(Map<?, ?> data)
             throws UnsupportedEncodingException {
@@ -660,6 +678,12 @@ public class OrderServiceImpl implements OrderService {
         return queryString.toString();
     }
 
+    /**
+     * 计算MD5
+     *
+     * @param md5
+     * @return
+     */
     // 来自stackoverflow的MD5计算方法，调用了MessageDigest库函数，并把byte数组结果转换成16进制
     public String MD5(String md5) {
         try {
