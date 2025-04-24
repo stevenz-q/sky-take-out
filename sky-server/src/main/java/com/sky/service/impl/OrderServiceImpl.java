@@ -21,6 +21,7 @@ import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderStatisticsVO;
 import com.sky.vo.OrderSubmitVO;
 import com.sky.vo.OrderVO;
+import com.sky.websocket.WebSocketServer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.RandomStringUtils;
 import org.springframework.beans.BeanUtils;
@@ -63,6 +64,8 @@ public class OrderServiceImpl implements OrderService {
     private static final String URL = "https://api.map.baidu.com"; // 百度API地址
     private static final String GEOCODING_PATH = "/geocoding/v3"; // 地理编码路径
     private static final String DIRECTIONLITE_PATH = "/directionlite/v1/driving"; // 驾车规划路径
+    @Autowired
+    private WebSocketServer webSocketServer;
 
     /**
      * 用户下单
@@ -196,6 +199,16 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         orderMapper.update(orders);
+
+        // 通过WebSocket向客户端浏览器推送消息 type orderId content
+        Map map = new HashMap();
+        map.put("type", 1); // 1表示来单提醒 2表示客户催单
+        map.put("orderId", orders.getId());
+        map.put("content", "订单号: " + outTradeNo);
+
+        String json = JSON.toJSONString(map);
+        webSocketServer.sendToAllClient(json);
+
     }
 
     /**
