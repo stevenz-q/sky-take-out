@@ -77,4 +77,12 @@ public interface OrderMapper {
      * @return
      */
     Double sumByMap(Map map);
+
+    /**
+     * 查询区间内订单总数
+     *
+     * @param map
+     * @return
+     */
+    Integer countByMap(Map map);
 }
