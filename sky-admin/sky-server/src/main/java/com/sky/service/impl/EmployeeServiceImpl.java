@@ -1,29 +1,28 @@
 package com.sky.service.impl;
 
+import cn.dev33.satoken.secure.BCrypt;
+import cn.dev33.satoken.stp.StpUtil;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.sky.constant.MessageConstant;
 import com.sky.constant.PasswordConstant;
 import com.sky.constant.StatusConstant;
-import com.sky.context.BaseContext;
 import com.sky.dto.EmployeeDTO;
 import com.sky.dto.EmployeeLoginDTO;
 import com.sky.dto.EmployeePageQueryDTO;
 import com.sky.entity.Employee;
 import com.sky.exception.AccountLockedException;
 import com.sky.exception.AccountNotFoundException;
+import com.sky.exception.BaseException;
 import com.sky.exception.PasswordErrorException;
 import com.sky.mapper.EmployeeMapper;
 import com.sky.result.PageResult;
 import com.sky.service.EmployeeService;
+import com.sky.vo.EmployeeLoginVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
-import java.time.DateTimeException;
-import java.time.LocalDateTime;
-import java.util.Date;
 
 @Service
 public class EmployeeServiceImpl implements EmployeeService {
@@ -37,7 +36,8 @@ public class EmployeeServiceImpl implements EmployeeService {
      * @param employeeLoginDTO
      * @return
      */
-    public Employee login(EmployeeLoginDTO employeeLoginDTO) {
+    @Override
+    public EmployeeLoginVO login(EmployeeLoginDTO employeeLoginDTO) {
         String username = employeeLoginDTO.getUsername();
         String password = employeeLoginDTO.getPassword();
 
@@ -51,24 +51,37 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
 
         //密码比对
-        // 后期需要进行md5加密，然后再进行比对
-        password = DigestUtils.md5DigestAsHex(password.getBytes());
-        if (!password.equals(employee.getPassword())) {
-            //密码错误
+        if (!BCrypt.checkpw(password, employee.getPassword())) {
             throw new PasswordErrorException(MessageConstant.PASSWORD_ERROR);
         }
 
-        if (employee.getStatus() == StatusConstant.DISABLE) {
+        if (StatusConstant.DISABLE.equals(employee.getStatus())) {
             //账号被锁定
             throw new AccountLockedException(MessageConstant.ACCOUNT_LOCKED);
         }
 
+        // 登录，生成token
+        StpUtil.login(employee.getId());
+        String token = StpUtil.getTokenValue();
+
+        // 将用户信息存入Session
+        StpUtil.getSession().set("employee", employee);
+
         //3、返回实体对象
-        return employee;
+        return new EmployeeLoginVO(employee.getId(), employee.getUsername(), employee.getName(), token);
+    }
+
+    /**
+     * 员工登出
+     */
+    @Override
+    public void logout() {
+        StpUtil.logout();
     }
 
     /**
      * 新增员工
+     *
      * @param employeeDTO
      */
     @Override
@@ -79,7 +92,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 //        设置账号状态 常量类
         employee.setStatus(StatusConstant.ENABLE);
 //        设置账号密码
-        employee.setPassword(DigestUtils.md5DigestAsHex(PasswordConstant.DEFAULT_PASSWORD.getBytes()));
+        employee.setPassword(BCrypt.hashpw(PasswordConstant.DEFAULT_PASSWORD));
 /*
 //        设置当前记录的创建人id和修改人id
 //        通过获取线程局部变量获取
@@ -94,23 +107,34 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     /**
      * 分页查询员工
+     *
      * @param employeePageQueryDTO
      * @return
      */
     @Override
     public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
-        PageHelper.startPage(employeePageQueryDTO.getPage(),employeePageQueryDTO.getPageSize());
+        PageHelper.startPage(employeePageQueryDTO.getPage(), employeePageQueryDTO.getPageSize());
         Page<Employee> page = employeeMapper.pageQuery(employeePageQueryDTO);
-        return new PageResult(page.getTotal(),page.getResult());
+        return new PageResult(page.getTotal(), page.getResult());
     }
 
     /**
      * 启用禁用员工账号
+     *
      * @param status
      * @param id
      */
     @Override
     public void startOrStop(Integer status, Long id) {
+        if (id == StpUtil.getLoginIdAsLong()) {
+            throw new BaseException("不能禁用自己的账号！");
+        }
+
+        if (status == 0) {
+            // 强制注销
+            StpUtil.logout(id);
+        }
+
         Employee employee = Employee.builder()
                 .id(id)
                 .status(status)
@@ -120,6 +144,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     /**
      * 根据id查询员工信息
+     *
      * @param id
      * @return
      */
@@ -132,6 +157,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     /**
      * 编辑员工信息
+     *
      * @param employeeDTO
      */
     @Override

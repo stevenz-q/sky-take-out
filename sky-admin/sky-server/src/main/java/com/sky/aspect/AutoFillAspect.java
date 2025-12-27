@@ -1,8 +1,8 @@
 package com.sky.aspect;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.sky.annotation.AutoFill;
 import com.sky.constant.AutoFillConstant;
-import com.sky.context.BaseContext;
 import com.sky.enumeration.OperationType;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -51,7 +51,7 @@ public class AutoFillAspect {
 
 //        准备赋值的数据
         LocalDateTime now = LocalDateTime.now();
-        Long currentId = BaseContext.getCurrentId();
+        Long currentId = StpUtil.getLoginIdAsLong();
 
 //        根据当前不同的数据类型,为对应的属性通过反射来赋值
         if (operationType == OperationType.INSERT) {

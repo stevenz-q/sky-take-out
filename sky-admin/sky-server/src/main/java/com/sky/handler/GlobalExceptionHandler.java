@@ -1,5 +1,7 @@
 package com.sky.handler;
 
+import cn.dev33.satoken.exception.NotLoginException;
+import cn.dev33.satoken.exception.NotRoleException;
 import com.sky.constant.MessageConstant;
 import com.sky.exception.BaseException;
 import com.sky.result.Result;
@@ -7,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import javax.lang.model.type.UnknownTypeException;
+import javax.servlet.http.HttpServletResponse;
 import java.sql.SQLIntegrityConstraintViolationException;
 
 /**
@@ -46,5 +48,24 @@ public class GlobalExceptionHandler {
         else
             return Result.error(MessageConstant.UNKNOWN_ERROR);
 
+    }
+
+    /**
+     * 处理未登录异常
+     */
+    @ExceptionHandler(NotLoginException.class)
+    public Result<Void> handleNotLoginException(NotLoginException e, HttpServletResponse response) {
+        log.error("未登录异常：", e);
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        return Result.error(401, "请先登录");
+    }
+
+    /**
+     * 处理权限不足异常
+     */
+    @ExceptionHandler(NotRoleException.class)
+    public Result<Void> handleNotRoleException(NotRoleException e) {
+        log.error("权限不足异常：", e);
+        return Result.error(403, "权限不足");
     }
 }
