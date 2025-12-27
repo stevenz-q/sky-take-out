@@ -1,6 +1,7 @@
 package com.sky.config;
 
-import com.sky.interceptor.JwtTokenAdminInterceptor;
+import cn.dev33.satoken.interceptor.SaInterceptor;
+import cn.dev33.satoken.stp.StpUtil;
 import com.sky.interceptor.JwtTokenUserInterceptor;
 import com.sky.json.JacksonObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -28,8 +29,8 @@ import java.util.List;
 @Slf4j
 public class WebMvcConfiguration extends WebMvcConfigurationSupport {
 
-    @Autowired
-    private JwtTokenAdminInterceptor jwtTokenAdminInterceptor;
+/*    @Autowired
+    private JwtTokenAdminInterceptor jwtTokenAdminInterceptor;*/
 
     @Autowired
     private JwtTokenUserInterceptor jwtTokenUserInterceptor;
@@ -41,10 +42,13 @@ public class WebMvcConfiguration extends WebMvcConfigurationSupport {
      */
     protected void addInterceptors(InterceptorRegistry registry) {
         log.info("开始注册自定义拦截器...");
-        registry.addInterceptor(jwtTokenAdminInterceptor)
+/*        registry.addInterceptor(jwtTokenAdminInterceptor)
                 .addPathPatterns("/admin/**")
-                .excludePathPatterns("/admin/employee/login");
-
+                .excludePathPatterns("/admin/employee/login");*/
+        // 注册sa-token拦截器
+        registry.addInterceptor(new SaInterceptor(handle -> StpUtil.checkLogin()))
+                .addPathPatterns("/admin/**")
+                .excludePathPatterns("/admin/employee/login", "/error");
         registry.addInterceptor(jwtTokenUserInterceptor)
                 .addPathPatterns("/user/**")
                 .excludePathPatterns("/user/user/login")

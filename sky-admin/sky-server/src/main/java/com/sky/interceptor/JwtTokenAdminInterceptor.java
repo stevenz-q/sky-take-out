@@ -10,13 +10,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
 
 /**
  * jwt令牌校验的拦截器
  */
-@Component
+
+//@Component
 @Slf4j
 public class JwtTokenAdminInterceptor implements HandlerInterceptor {
 
@@ -54,7 +57,7 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
             return true;
         } catch (Exception ex) {
             //4、不通过，响应401状态码
-                    response.setStatus(401);
+            response.setStatus(401);
             return false;
         }
     }
